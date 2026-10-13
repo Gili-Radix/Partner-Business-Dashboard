@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Partner Insights Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f4f4f2; --surface:#fcfcfb; --surface-2:#f0efec; --border:#e2e1dc;
+  --text:#0b0b0b; --text-2:#52514e; --muted:#8a8984; --accent:#2a78d6;
+  --s1:#2a78d6; --s1b:#86b6ef; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --critical:#d03b3b;
+  --grid:#e9e8e4;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#111110; --surface:#1a1a19; --surface-2:#242422; --border:#33332f;
+    --text:#f0efec; --text-2:#c3c2b7; --muted:#8f8e86; --accent:#3987e5;
+    --s1:#3987e5; --s1b:#1c5cab; --s2:#d95926; --s3:#199e70; --s4:#c98500; --grid:#2b2b28;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#111110; --surface:#1a1a19; --surface-2:#242422; --border:#33332f;
+  --text:#f0efec; --text-2:#c3c2b7; --muted:#8f8e86; --accent:#3987e5;
+  --s1:#3987e5; --s1b:#1c5cab; --s2:#d95926; --s3:#199e70; --s4:#c98500; --grid:#2b2b28;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center}
+header h1{font-size:17px;margin:0;font-weight:650}
+header .meta{color:var(--text-2);font-size:13px}
+.spacer{flex:1}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;color:var(--text-2);padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;border-right:1px solid var(--border)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--accent);color:#fff}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--text);padding:6px 12px;border-radius:8px;font:inherit;font-size:13px;cursor:pointer}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+main{padding:20px 24px 60px;max-width:1500px;margin:0 auto}
+.drop{border:2px dashed var(--border);border-radius:14px;padding:60px 20px;text-align:center;background:var(--surface);color:var(--text-2);cursor:pointer;margin-top:40px}
+.drop.over{border-color:var(--accent);background:var(--surface-2)}
+.drop strong{display:block;color:var(--text);font-size:18px;margin-bottom:6px}
+.section-title{display:flex;align-items:baseline;gap:10px;margin:26px 0 10px}
+.section-title h2{font-size:15px;margin:0;font-weight:650}
+.section-title span{color:var(--muted);font-size:12.5px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.kpi .l{color:var(--text-2);font-size:12.5px}
+.kpi .v{font-size:26px;font-weight:650;letter-spacing:-.01em;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .s{color:var(--muted);font-size:12px;margin-top:2px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(560px,1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;min-width:0}
+.card h3{font-size:13.5px;margin:0 0 2px;font-weight:620}
+.card .sub{color:var(--muted);font-size:12px;margin-bottom:10px}
+.chart{position:relative;height:270px}
+.empty{color:var(--muted);font-size:13px;padding:30px 0;text-align:center}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:7px 10px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td.t,th.t{text-align:left}
+th{color:var(--text-2);font-weight:600;font-size:12px;cursor:pointer;user-select:none;position:sticky;top:0;background:var(--surface)}
+th.sorted::after{content:" ▾";color:var(--accent)}
+th.sorted.asc::after{content:" ▴"}
+tr:hover td{background:var(--surface-2)}
+.tablewrap{overflow:auto;max-height:560px}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+.tabs button{border:1px solid var(--border);background:var(--surface);color:var(--text-2);padding:6px 12px;border-radius:999px;font:inherit;font-size:12.5px;cursor:pointer}
+.tabs button.on{background:var(--text);color:var(--surface);border-color:var(--text)}
+.tabs input{margin-left:auto;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;min-width:200px}
+.pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px;color:var(--text-2);font-size:12.5px}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;background:var(--surface-2);color:var(--text-2)}
+.note{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--warn);border-radius:8px;padding:10px 14px;color:var(--text-2);font-size:12.5px;margin-top:12px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+dialog{border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);max-width:760px;width:calc(100% - 32px);padding:20px 22px}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+dialog h3{margin:0 0 12px}
+dialog h4{margin:18px 0 6px;font-size:13px}
+dialog input,dialog select{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:6px;padding:5px 8px;font:inherit;font-size:13px}
+.price-row{display:flex;gap:8px;align-items:center;margin:4px 0;flex-wrap:wrap}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:50}
+.overlay.on{display:flex}
+.overlay div{background:var(--surface);padding:18px 26px;border-radius:12px;border:1px solid var(--border)}
+.small{font-size:12px;color:var(--muted)}
+@media (max-width:700px){
+  header{padding:10px 16px;position:static} main{padding:14px 16px 40px}
+  .grid{grid-template-columns:1fr} .tabs input{min-width:0;width:100%;margin-left:0}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Partner Insights</h1>
+  <span class="meta" id="meta">No report loaded</span>
+  <span class="spacer"></span>
+  <div class="seg" id="partnerSeg"></div>
+  <div class="seg" id="periodSeg"></div>
+  <button class="btn" id="settingsBtn" title="Pricing, churn window, snapshots">⚙ Settings</button>
+  <button class="btn primary" id="loadBtn">↑ Load weekly xlsx</button>
+  <input type="file" id="file" accept=".xlsx,.xls,.xlsm" hidden>
+</header>
+
+<main id="main">
+  <div class="drop" id="drop">
+    <strong>Drop the weekly shob report (.xlsx) here</strong>
+    or click to choose a file. The file is processed in your browser only — nothing is uploaded anywhere.
+  </div>
+</main>
+
+<div class="overlay" id="overlay"><div id="overlayMsg">Reading workbook…</div></div>
+
+<dialog id="settings">
+  <h3>Settings</h3>
+  <h4>Price per device (USD) — used for estimated revenue</h4>
+  <div class="small">A price applies from its "from month" onward. Add a row when a partner's price changes.</div>
+  <div id="priceEditor"></div>
+  <h4>Churn-risk window</h4>
+  <div class="price-row">Active account with no activity in the last
+    <select id="churnDays"><option value="30">30 days</option><option value="60">60 days</option><option value="90">90 days</option></select>
+  </div>
+  <h4>Date fix</h4>
+  <label class="price-row"><input type="checkbox" id="swapDates"> Excel-converted date cells have day and month swapped (keep on for the current shob export)</label>
+  <h4>Loaded snapshots (stored in this browser)</h4>
+  <div class="small">Each weekly upload is stored as a snapshot of devices per account. Two or more snapshots let the dashboard measure devices added in existing accounts.</div>
+  <div id="snapList"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">
+    <button class="btn" id="resetPrices">Reset prices to defaults</button>
+    <button class="btn primary" id="closeSettings">Save &amp; close</button>
+  </div>
+</dialog>
+
+<script>
+/* ============================== CONFIG ============================== */
+const PARTNERS = [
+  { key:'promethean', name:'Promethean', oems:['promethean'], defaults:['promethean'], color:'--s1' },
+  { key:'newline', name:'Newline', oems:['newline'], defaults:['newline_default'], color:'--s2' },
+  { key:'bxct', name:'Boxlight & Clevertouch', oems:['boxlight','clevertouch'], defaults:['boxlight_default','clevertouch'], color:'--s3' },
+];
+const DEFAULT_PRICES = {
+  promethean:{ label:'per device / 1 year', steps:[{from:'2000-01',price:6.16},{from:'2026-01',price:4}] },
+  newline:{ label:'per device / 5 years', steps:[{from:'2000-01',price:10}] },
+  bxct:{ label:'per device / 1 year', steps:[{from:'2000-01',price:7.9}] },
+};
+const FEATURES = [
+  ['Remote support','Remote support'],['Power mgmt.','Power management'],['App install','Install apps'],
+  ['Device settings','Device configuration'],['Advanced messaging','Advanced messaging'],['Workflow','Workflows'],['Profiles','Profiles']
+];
+const SIZE_TIERS = [[1000,Infinity,'1,000+ devices'],[500,999,'500–999'],[100,499,'100–499'],[1,99,'1–99']];
+const CHURN_TIERS = [[1,19,'1–19'],[20,99,'20–99'],[100,499,'100–499'],[500,999,'500–999'],[1000,Infinity,'1,000+']];
+const PERIODS = [3,6,9,12];
+
+/* ============================== STATE ============================== */
+const LS = { get(k,d){try{const v=localStorage.getItem('pd_'+k);return v?JSON.parse(v):d}catch(e){return d}},
+             set(k,v){try{localStorage.setItem('pd_'+k,JSON.stringify(v))}catch(e){}} };
+const S = {
+  partner: LS.get('partner','promethean'),
+  period: LS.get('period',12),
+  prices: LS.get('prices', JSON.parse(JSON.stringify(DEFAULT_PRICES))),
+  churnDays: LS.get('churnDays',90),
+  swapDates: LS.get('swapDates',true),
+  data:null,          // {reportDate, accounts:{partnerKey:[...]}}
+  baseline:{},        // partnerKey -> {YYYY-MM:{accounts,devices}} from overview sheets
+  snapshots:[],       // [{date, partners:{key:{domain:devices}}}]
+  tab:'new', search:'', page:0, sort:{}
+};
+window.__S = S;
+const charts = {};
+const $ = s => document.querySelector(s);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = n => n==null||isNaN(n)?'—':Math.round(n).toLocaleString('en-US');
+const fmt1 = n => n==null||isNaN(n)?'—':n.toLocaleString('en-US',{maximumFractionDigits:1});
+const usd = n => n==null||isNaN(n)?'—':'$'+Math.round(n).toLocaleString('en-US');
+const pct = (a,b) => b? (100*a/b).toLocaleString('en-US',{maximumFractionDigits:1})+'%' : '—';
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ============================== IndexedDB snapshots ============================== */
+const DB = {
+  open(){ return new Promise((res,rej)=>{ try{ const r=indexedDB.open('partnerDash',1);
+    r.onupgradeneeded=()=>{ const db=r.result; db.createObjectStore('snapshots',{keyPath:'date'}); db.createObjectStore('baseline',{keyPath:'key'}); };
+    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);}catch(e){rej(e)} }); },
+  async all(store){ try{ const db=await this.open(); return await new Promise((res)=>{ const q=db.transaction(store).objectStore(store).getAll(); q.onsuccess=()=>res(q.result||[]); q.onerror=()=>res([]); }); }catch(e){ return []; } },
+  async put(store,v){ try{ const db=await this.open(); await new Promise(res=>{ const t=db.transaction(store,'readwrite'); t.objectStore(store).put(v); t.oncomplete=res; t.onerror=res; }); }catch(e){} },
+  async del(store,k){ try{ const db=await this.open(); await new Promise(res=>{ const t=db.transaction(store,'readwrite'); t.objectStore(store).delete(k); t.oncomplete=res; t.onerror=res; }); }catch(e){} }
+};
+
+/* ============================== PARSING ============================== */
+const MON = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12};
+const pad = n => String(n).padStart(2,'0');
+function ymd(y,m,d){ if(!(m>=1&&m<=12&&d>=1&&d<=31&&y>1990&&y<2100)) return null; return `${y}-${pad(m)}-${pad(d)}`; }
+function pdate(v){
+  if(v==null||v==='') return null;
+  if(typeof v==='number'){ const p=XLSX.SSF.parse_date_code(v); if(!p) return null;
+    return S.swapDates ? ymd(p.y,p.d,p.m) : ymd(p.y,p.m,p.d); }
+  if(v instanceof Date){ return S.swapDates ? ymd(v.getFullYear(),v.getDate(),v.getMonth()+1) : ymd(v.getFullYear(),v.getMonth()+1,v.getDate()); }
+  const s=String(v).trim(); let m;
+  if((m=s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return ymd(+m[1],+m[2],+m[3]);
+  if((m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))) return ymd(+m[3],+m[1],+m[2]);
+  if((m=s.match(/^\w{3} (\w{3}) (\d{1,2}) (\d{4})/))) return ymd(+m[3],MON[m[1].toLowerCase()],+m[2]);
+  return null;
+}
+const num = v => typeof v==='number' && isFinite(v) ? v : (typeof v==='string' && v.trim()!=='' && !isNaN(+v) ? +v : 0);
+const bool = v => v===true || String(v).toLowerCase()==='true';
+
+function partnerOf(oem){ const o=String(oem||'').toLowerCase().trim(); return PARTNERS.find(p=>p.oems.includes(o)); }
+
+async function handleFile(file){
+  overlay(true,'Reading workbook…');
+  await new Promise(r=>setTimeout(r,30));
+  try{
+    const buf = await file.arrayBuffer();
+    const names = XLSX.read(buf,{type:'array',bookSheets:true}).SheetNames;
+    const raw = names.find(n=>/shob/i.test(n)) || names[0];
+    const ov = names.filter(n=>/overview/i.test(n));
+    overlay(true,'Parsing '+raw+'…'); await new Promise(r=>setTimeout(r,30));
+    const wb = XLSX.read(buf,{type:'array',sheets:[raw,...ov],dense:true});
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[raw],{header:1,raw:true,defval:null});
+    const hi = rows.findIndex(r=>r && String(r[0]).trim().toLowerCase()==='domain');
+    if(hi<0) throw new Error('Could not find the header row (a row starting with "domain") in sheet "'+raw+'".');
+    const H = {}; rows[hi].forEach((h,i)=>{ if(h!=null) H[String(h).trim()]=i; });
+    const col = (r,k)=> H[k]==null?null:r[H[k]];
+    let reportDate=null;
+    const accounts = {}; PARTNERS.forEach(p=>accounts[p.key]=[]);
+    for(let i=hi+1;i<rows.length;i++){
+      const r=rows[i]; if(!r) continue;
+      let domain=String(r[0]??'').trim(); if(/^DeprecationWarning/.test(domain)) continue;
+      if(!domain) domain='(no domain) '+(col(r,'admin email')||'row '+(i+1));
+      if(!reportDate && col(r,'report generated')) reportDate=pdate(col(r,'report generated'));
+      const p=partnerOf(col(r,'oem')); if(!p) continue;
+      const feats={}; FEATURES.forEach(([k])=>feats[k]=num(col(r,k)));
+      accounts[p.key].push({
+        domain, oem:String(col(r,'oem')).toLowerCase(),
+        company: col(r,'company') || col(r,'sso org name') || '',
+        country: col(r,'country') || '',
+        trial: bool(col(r,'trial?')),
+        credits: num(col(r,'credits')), devices: num(col(r,'num of devices')),
+        created: pdate(col(r,'create date')), lastAct: pdate(col(r,'last activity')),
+        cmds: num(col(r,'num commands')), feats,
+        isDefault: p.defaults.includes(domain.toLowerCase())
+      });
+    }
+    if(!reportDate){ reportDate = (file.name.match(/(\d{4}-\d{2}-\d{2})/)||[])[1] || new Date().toISOString().slice(0,10); }
+    const total = Object.values(accounts).reduce((a,b)=>a+b.length,0);
+    if(!total) throw new Error('No Promethean / Newline / Boxlight / Clevertouch rows found. Check the "oem" column.');
+    S.data = {reportDate, accounts, file:file.name};
+    // overview sheets -> baseline for existing-account device growth
+    for(const n of ov){ parseOverview(n, wb.Sheets[n], reportDate); }
+    // snapshot
+    const snap={date:reportDate,partners:{}};
+    PARTNERS.forEach(p=>{ const m={}; accounts[p.key].forEach(a=>{ if(a.devices>0) m[a.domain]=a.devices; }); snap.partners[p.key]=m; });
+    await DB.put('snapshots',snap);
+    S.snapshots = (await DB.all('snapshots')).sort((a,b)=>a.date<b.date?-1:1);
+    S.page=0; render();
+  }catch(e){ console.error(e); alert('Could not load this file:\n'+e.message); }
+  overlay(false);
+}
+
+function parseOverview(name, ws, reportDate){
+  const p = PARTNERS.find(p=> new RegExp(p.key==='bxct'?'boxlight|clevertouch':p.key,'i').test(name)); if(!p) return;
+  const rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  const i = rows.findIndex(r=>r && /last 12 months/i.test(r[0]||'') && /number of accounts \(existing\)/i.test(r[1]||''));
+  if(i<0) return;
+  const ry=+reportDate.slice(0,4), rm=+reportDate.slice(5,7);
+  const out={};
+  for(let j=i+1;j<i+14 && j<rows.length;j++){
+    const r=rows[j]; if(!r||!r[0]) continue; const m=MON[String(r[0]).trim().toLowerCase()]; if(!m) continue;
+    const y = m>rm ? ry-1 : ry;
+    out[`${y}-${pad(m)}`]={accounts:num(r[1]),devices:num(r[2])};
+  }
+  if(Object.keys(out).length){ S.baseline[p.key]=out; DB.put('baseline',{key:p.key,months:out}); }
+}
+
+/* ============================== METRICS ============================== */
+function monthsBack(reportDate,n){ let y=+reportDate.slice(0,4), m=+reportDate.slice(5,7); const out=[];
+  for(let i=0;i<n;i++){ out.unshift(`${y}-${pad(m)}`); m--; if(!m){m=12;y--;} } return out; }
+const mLabel = k => new Date(+k.slice(0,4), +k.slice(5,7)-1, 1).toLocaleString('en-US',{month:'short',year:'2-digit'});
+function priceAt(pk,month){ const st=(S.prices[pk]||DEFAULT_PRICES[pk]).steps.slice().sort((a,b)=>a.from<b.from?-1:1); let p=0; st.forEach(s=>{ if(s.from<=month) p=+s.price; }); return p; }
+const isActive = a => a.credits>=1 && a.devices>=1;
+function daysBetween(a,b){ return (Date.parse(b)-Date.parse(a))/864e5; }
+
+function existingGrowth(pk, months){
+  // months -> {accounts, devices, source}
+  const out={}; const base=S.baseline[pk]||{};
+  months.forEach(m=>{ if(base[m]) out[m]={...base[m],source:'overview'}; });
+  const snaps=S.snapshots.filter(s=>s.partners&&s.partners[pk]);
+  for(let i=1;i<snaps.length;i++){
+    const a=snaps[i-1].partners[pk], b=snaps[i].partners[pk], m=snaps[i].date.slice(0,7);
+    if(!months.includes(m)) continue;
+    let dev=0,acc=0; for(const d in b){ if(d in a){ const x=b[d]-a[d]; if(x>0){dev+=x;acc++;} } }
+    if(!out[m]||out[m].source==='overview') out[m]={accounts:0,devices:0,source:'snapshots'};
+    out[m].accounts+=acc; out[m].devices+=dev;
+  }
+  return out;
+}
+
+function compute(pk){
+  const D=S.data, A=D.accounts[pk], rd=D.reportDate, months=monthsBack(rd,S.period), first=months[0];
+  const r={pk, months};
+  r.totalAccounts=A.length; r.totalDevices=A.reduce((s,a)=>s+a.devices,0);
+  r.defaultDevices=A.filter(a=>a.isDefault).reduce((s,a)=>s+a.devices,0);
+  const act=A.filter(isActive); r.active=act; r.activeAccounts=act.length; r.activeDevices=act.reduce((s,a)=>s+a.devices,0);
+  r.creditsNoDevices=A.filter(a=>a.credits>=1&&a.devices<1).length;
+  r.inactiveDevices=r.totalDevices-r.activeDevices-r.defaultDevices;
+  r.tiers=SIZE_TIERS.map(([lo,hi,l])=>{ const t=act.filter(a=>a.devices>=lo&&a.devices<=hi); return {label:l,accounts:t.length,devices:t.reduce((s,a)=>s+a.devices,0)}; });
+  // new accounts in period
+  const nw=A.filter(a=>a.created && a.created.slice(0,7)>=first && a.created.slice(0,7)<=months[months.length-1]);
+  r.newAccts=nw;
+  r.monthly=months.map(m=>{ const x=nw.filter(a=>a.created.slice(0,7)===m); const withDev=x.filter(a=>a.devices>0);
+    const dev=x.reduce((s,a)=>s+a.devices,0); const price=priceAt(pk,m);
+    return {m, newAccounts:x.length, withDevices:withDev.length, zero:x.length-withDev.length, newDevices:dev, price, newRevenue:dev*price}; });
+  const eg=existingGrowth(pk,months);
+  r.monthly.forEach(o=>{ const e=eg[o.m]; o.exAccounts=e?e.accounts:null; o.exDevices=e?e.devices:null; o.exSource=e?e.source:null; o.exRevenue=e?e.devices*o.price:null; });
+  r.hasExisting=r.monthly.some(o=>o.exDevices!=null);
+  r.exMonths=r.monthly.filter(o=>o.exDevices!=null).length;
+  const sum=k=>r.monthly.reduce((s,o)=>s+(o[k]||0),0);
+  r.newAccounts=sum('newAccounts'); r.newWithDevices=sum('withDevices'); r.newDevices=sum('newDevices'); r.newRevenue=sum('newRevenue');
+  r.exDevices=sum('exDevices'); r.exRevenue=sum('exRevenue');
+  r.avgDevNew = r.newWithDevices? r.newDevices/r.newWithDevices : null;
+  // feature adoption among new accounts with devices (Nadav's definition) and all active accounts
+  const nwd=nw.filter(a=>a.devices>0);
+  r.featNew=FEATURES.map(([k,l])=>({label:l, n:nwd.filter(a=>a.feats[k]>0).length, base:nwd.length}));
+  r.featAll=FEATURES.map(([k,l])=>({label:l, n:act.filter(a=>a.feats[k]>0).length, base:act.length}));
+  // churn risk
+  r.churnList=act.filter(a=>!a.lastAct || daysBetween(a.lastAct,rd)>S.churnDays);
+  r.churn=CHURN_TIERS.map(([lo,hi,l])=>{ const t=r.churnList.filter(a=>a.devices>=lo&&a.devices<=hi); const base=act.filter(a=>a.devices>=lo&&a.devices<=hi);
+    return {label:l,accounts:t.length,devices:t.reduce((s,a)=>s+a.devices,0),baseAccounts:base.length,baseDevices:base.reduce((s,a)=>s+a.devices,0)}; });
+  r.churnAccounts=r.churnList.length; r.churnDevices=r.churnList.reduce((s,a)=>s+a.devices,0);
+  // country
+  const c={}; act.forEach(a=>{ const k=a.country||'(unknown)'; c[k]=c[k]||{country:k,active:0,devices:0,newAcc:0,newDev:0}; c[k].active++; c[k].devices+=a.devices; });
+  nw.forEach(a=>{ const k=a.country||'(unknown)'; c[k]=c[k]||{country:k,active:0,devices:0,newAcc:0,newDev:0}; c[k].newAcc++; c[k].newDev+=a.devices; });
+  r.countries=Object.values(c);
+  return r;
+}
+window.__compute = compute;
+
+/* ============================== RENDER ============================== */
+function overlay(on,msg){ $('#overlay').classList.toggle('on',on); if(msg) $('#overlayMsg').textContent=msg; }
+function seg(el, items, cur, onClick){ el.innerHTML=items.map(([v,l])=>`<button data-v="${v}" class="${String(v)===String(cur)?'on':''}">${l}</button>`).join('');
+  el.querySelectorAll('button').forEach(b=>b.onclick=()=>onClick(b.dataset.v)); }
+
+function renderHeader(){
+  seg($('#partnerSeg'), [...PARTNERS.map(p=>[p.key,p.name]),['all','Compare all']], S.partner, v=>{S.partner=v;LS.set('partner',v);S.page=0;render();});
+  seg($('#periodSeg'), PERIODS.map(p=>[p,p+'M']), S.period, v=>{S.period=+v;LS.set('period',+v);S.page=0;render();});
+  if(S.data){ const ms=monthsBack(S.data.reportDate,S.period);
+    $('#meta').innerHTML=`Report <b>${S.data.reportDate}</b> · Period ${mLabel(ms[0])} – ${mLabel(ms[ms.length-1])} · ${S.snapshots.length} snapshot${S.snapshots.length===1?'':'s'} stored`; }
+}
+
+function kpi(l,v,s){ return `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div>${s?`<div class="s">${s}</div>`:''}</div>`; }
+function card(id,title,sub,body){ return `<div class="card"><h3>${title}</h3><div class="sub">${sub||''}</div>${body||`<div class="chart"><canvas id="${id}"></canvas></div>`}</div>`; }
+
+function render(){
+  renderHeader();
+  if(!S.data) return;
+  Object.values(charts).forEach(c=>c.destroy()); for(const k in charts) delete charts[k];
+  if(S.partner==='all') return renderCompare();
+  const p=PARTNERS.find(x=>x.key===S.partner)||PARTNERS[0]; const r=compute(p.key);
+  const pr=S.prices[p.key]||DEFAULT_PRICES[p.key];
+  let h='';
+  h+=`<div class="section-title"><h2>${p.name} — current footprint</h2><span>as of ${S.data.reportDate} (not affected by the period filter)</span></div><div class="kpis">`;
+  h+=kpi('Total accounts',fmt(r.totalAccounts));
+  h+=kpi('Total devices',fmt(r.totalDevices), `${fmt(r.defaultDevices)} in default accounts`);
+  h+=kpi('Active accounts',fmt(r.activeAccounts), `${pct(r.activeAccounts,r.totalAccounts)} of accounts · ≥1 credit & ≥1 device`);
+  h+=kpi('Devices in active accounts',fmt(r.activeDevices), `${pct(r.activeDevices,r.totalDevices)} of all devices`);
+  h+=kpi('Churn-risk accounts',fmt(r.churnAccounts), `${pct(r.churnAccounts,r.activeAccounts)} of active · no activity ${S.churnDays}+ days`);
+  h+=`</div>`;
+  h+=`<div class="section-title"><h2>Last ${S.period} months</h2><span>by account create date · revenue at $ ${pr.steps.map(s=>s.price).join(' → ')} ${pr.label}</span></div><div class="kpis">`;
+  h+=kpi('New accounts',fmt(r.newAccounts), `${fmt1(r.newAccounts/S.period)} per month`);
+  h+=kpi('New accounts with devices',fmt(r.newWithDevices), `${pct(r.newWithDevices,r.newAccounts)} activation`);
+  h+=kpi('Devices in new accounts',fmt(r.newDevices), `avg ${fmt1(r.avgDevNew)} per activated account`);
+  h+=kpi('Est. revenue — new accounts',usd(r.newRevenue));
+  h+=kpi('Est. revenue — existing accounts', r.hasExisting?usd(r.exRevenue):'—', r.hasExisting?`${fmt(r.exDevices)} devices added · ${r.exMonths}/${S.period} months of data`:'needs 2+ weekly snapshots or an overview sheet');
+  h+=`</div>`;
+  h+=`<div class="section-title"><h2>Trends</h2></div><div class="grid">`;
+  h+=card('cNew','New accounts per month','Stacked: with devices vs. no devices yet');
+  h+=card('cDev','Devices added per month','New accounts vs. growth in existing accounts');
+  h+=card('cRev','Estimated revenue per month (USD)','Devices × price for that month');
+  h+=card('cAvg','Average devices per activated new account','New accounts with ≥1 device');
+  h+=`</div>`;
+  h+=`<div class="section-title"><h2>Account health</h2></div><div class="grid">`;
+  h+=card('cTier','Active accounts by size','Share of devices in active accounts',null);
+  h+=card('cFeat','Feature adoption',`<span class="tabs" style="margin:0" id="featToggle"></span>`);
+  h+=card('','Churn risk by account size',`Active accounts with no activity in the last ${S.churnDays} days`, churnTable(r));
+  h+=card('','Active accounts by size — detail','', tierTable(r));
+  h+=`</div>`;
+  if(!r.hasExisting) h+=`<div class="note">Devices added to <b>existing</b> accounts can't be read from one report, because it only holds today's device count per account. The dashboard calculates it automatically from the second weekly upload onward, as the difference between consecutive snapshots. If the uploaded workbook includes Nadav's "overview" sheet, its monthly existing-account figures are used for past months.</div>`;
+  h+=`<div class="section-title"><h2>Accounts</h2></div><div class="card">${tableTabs()}<div id="tbl"></div></div>`;
+  $('#main').innerHTML=h;
+  drawPartnerCharts(r,p);
+  drawTable(r);
+}
+
+function baseOpts(stacked, yFmt){
+  const tc=css('--text-2'), gc=css('--grid');
+  return { responsive:true, maintainAspectRatio:false, animation:false,
+    interaction:{mode:'index',intersect:false},
+    plugins:{ legend:{position:'top',align:'start',labels:{color:tc,boxWidth:10,boxHeight:10,useBorderRadius:true,borderRadius:2,font:{size:12}}},
+      tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${yFmt?yFmt(c.parsed.y??c.parsed.x):fmt(c.parsed.y)}`}} },
+    scales:{ x:{stacked,grid:{display:false},ticks:{color:tc,font:{size:11},maxRotation:45,autoSkip:true},border:{color:gc}},
+             y:{stacked,beginAtZero:true,grid:{color:gc},border:{display:false},ticks:{color:tc,font:{size:11},callback:v=>yFmt?yFmt(v):fmt(v)}} } };
+}
+const bar = (label,data,color,extra={}) => ({type:'bar',label,data,backgroundColor:color,borderRadius:4,borderSkipped:'start',maxBarThickness:38,...extra});
+
+function drawPartnerCharts(r,p){
+  const L=r.months.map(mLabel), c1=css('--s1'), c1b=css('--s1b'), c2=css('--s2');
+  charts.new=new Chart($('#cNew'),{type:'bar',data:{labels:L,datasets:[bar('With devices',r.monthly.map(o=>o.withDevices),c1),bar('No devices',r.monthly.map(o=>o.zero),c1b)]},options:baseOpts(true)});
+  const ds=[bar('New accounts',r.monthly.map(o=>o.newDevices),c1)];
+  if(r.hasExisting) ds.push(bar('Existing accounts',r.monthly.map(o=>o.exDevices),c2));
+  charts.dev=new Chart($('#cDev'),{type:'bar',data:{labels:L,datasets:ds},options:baseOpts(true)});
+  const dr=[bar('New accounts',r.monthly.map(o=>o.newRevenue),c1)];
+  if(r.hasExisting) dr.push(bar('Existing accounts',r.monthly.map(o=>o.exRevenue),c2));
+  charts.rev=new Chart($('#cRev'),{type:'bar',data:{labels:L,datasets:dr},options:baseOpts(true,usd)});
+  const ao=baseOpts(false,fmt1); ao.plugins.legend.display=false;
+  charts.avg=new Chart($('#cAvg'),{type:'line',data:{labels:L,datasets:[{label:'Avg devices',data:r.monthly.map(o=>o.withDevices?o.newDevices/o.withDevices:null),borderColor:c1,backgroundColor:c1,borderWidth:2,pointRadius:4,pointHoverRadius:6,tension:0,spanGaps:true}]},options:ao});
+  // tiers horizontal
+  const to=baseOpts(false,v=>v+'%'); to.indexAxis='y'; to.plugins.legend.display=false;
+  to.scales.x.grid={color:css('--grid')}; to.scales.y.grid={display:false}; to.scales.x.ticks.callback=v=>v+'%'; to.scales.y.ticks.callback=function(v){return this.getLabelForValue(v)};
+  to.plugins.tooltip.callbacks.label=c=>{const t=r.tiers[c.dataIndex]; return ` ${t.accounts.toLocaleString()} accounts · ${fmt(t.devices)} devices (${c.parsed.x.toFixed(1)}%)`;};
+  charts.tier=new Chart($('#cTier'),{type:'bar',data:{labels:r.tiers.map(t=>t.label),datasets:[bar('Share of devices',r.tiers.map(t=>r.activeDevices?100*t.devices/r.activeDevices:0),c1,{borderSkipped:'start'})]},options:to});
+  drawFeat(r);
+}
+function drawFeat(r){
+  const mode=S.featMode||'new'; const tg=$('#featToggle');
+  if(tg){ tg.innerHTML=[['new','New accounts in period'],['all','All active accounts']].map(([v,l])=>`<button class="${v===mode?'on':''}" data-v="${v}">${l}</button>`).join('');
+    tg.querySelectorAll('button').forEach(b=>b.onclick=()=>{S.featMode=b.dataset.v; drawFeat(r);}); }
+  const F=(mode==='new'?r.featNew:r.featAll).slice().sort((a,b)=>b.n-a.n);
+  const o=baseOpts(false); o.indexAxis='y'; o.plugins.legend.display=false;
+  o.scales.x.grid={color:css('--grid')}; o.scales.y.grid={display:false}; o.scales.x.ticks.callback=v=>v+'%'; o.scales.y.ticks.callback=function(v){return this.getLabelForValue(v)};
+  o.plugins.tooltip.callbacks.label=c=>{const f=F[c.dataIndex]; return ` ${f.n.toLocaleString()} of ${f.base.toLocaleString()} accounts (${c.parsed.x.toFixed(1)}%)`;};
+  if(charts.feat) charts.feat.destroy();
+  charts.feat=new Chart($('#cFeat'),{type:'bar',data:{labels:F.map(f=>f.label),datasets:[bar('% of accounts using',F.map(f=>f.base?100*f.n/f.base:0),css('--s1'))]},options:o});
+}
+function churnTable(r){
+  let h=`<div class="tablewrap"><table><thead><tr><th class="t">Devices per account</th><th>At-risk accounts</th><th>Devices</th><th>% of tier accounts</th><th>% of active devices</th></tr></thead><tbody>`;
+  r.churn.forEach(t=>{ h+=`<tr><td>${t.label}</td><td>${fmt(t.accounts)}</td><td>${fmt(t.devices)}</td><td>${pct(t.accounts,t.baseAccounts)}</td><td>${pct(t.devices,r.activeDevices)}</td></tr>`; });
+  h+=`<tr><td><b>Total</b></td><td><b>${fmt(r.churnAccounts)}</b></td><td><b>${fmt(r.churnDevices)}</b></td><td><b>${pct(r.churnAccounts,r.activeAccounts)}</b></td><td><b>${pct(r.churnDevices,r.activeDevices)}</b></td></tr></tbody></table></div>`;
+  return h;
+}
+function tierTable(r){
+  let h=`<div class="tablewrap"><table><thead><tr><th class="t">Size</th><th>Accounts</th><th>Devices</th><th>% of active devices</th><th>Avg devices</th></tr></thead><tbody>`;
+  r.tiers.forEach(t=>{ h+=`<tr><td>${t.label}</td><td>${fmt(t.accounts)}</td><td>${fmt(t.devices)}</td><td>${pct(t.devices,r.activeDevices)}</td><td>${fmt(t.accounts?t.devices/t.accounts:null)}</td></tr>`; });
+  h+=`<tr><td><b>Active total</b></td><td><b>${fmt(r.activeAccounts)}</b></td><td><b>${fmt(r.activeDevices)}</b></td><td>100%</td><td>${fmt(r.activeDevices/r.activeAccounts)}</td></tr>`;
+  h+=`</tbody></table></div><div class="small" style="margin-top:8px">${fmt(r.creditsNoDevices)} more accounts have credits but no devices, so they don't count as active.</div>`;
+  return h;
+}
+
+/* ---------- account tables ---------- */
+const TABLES = {
+  new:{label:'New accounts in period', rows:r=>r.newAccts, cols:[
+    ['domain','Domain','t'],['company','Company','t'],['country','Country','t'],['created','Created','t'],['devices','Devices'],['credits','Credits'],['trial','Trial','t',a=>a.trial?'<span class="pill">trial</span>':''],['lastAct','Last activity','t'],['rev','Est. revenue',null,(a,r)=>usd(a.devices*priceAt(r.pk,a.created.slice(0,7))),(a,r)=>a.devices*priceAt(r.pk,a.created.slice(0,7))]], sort:['created',-1]},
+  top:{label:'Active accounts', rows:r=>r.active, cols:[
+    ['domain','Domain','t'],['company','Company','t'],['country','Country','t'],['devices','Devices'],['credits','Credits'],['cmds','Commands'],['cpd','Cmd / device',null,a=>fmt1(a.cmds/a.devices),a=>a.cmds/a.devices],['created','Created','t'],['lastAct','Last activity','t']], sort:['devices',-1]},
+  churn:{label:'Churn-risk accounts', rows:r=>r.churnList, cols:[
+    ['domain','Domain','t'],['company','Company','t'],['country','Country','t'],['devices','Devices'],['credits','Credits'],['lastAct','Last activity','t'],['idle','Days idle',null,(a,r)=>a.lastAct?fmt(daysBetween(a.lastAct,S.data.reportDate)):'never',a=>a.lastAct?daysBetween(a.lastAct,S.data.reportDate):1e9],['created','Created','t']], sort:['devices',-1]},
+  country:{label:'By country', rows:r=>r.countries, cols:[
+    ['country','Country','t'],['active','Active accounts'],['devices','Devices in active accounts'],['newAcc','New accounts (period)'],['newDev','Devices in new accounts']], sort:['devices',-1]},
+};
+function tableTabs(){ return `<div class="tabs" id="tabs">${Object.entries(TABLES).map(([k,t])=>`<button data-k="${k}" class="${k===S.tab?'on':''}">${t.label}</button>`).join('')}<input id="search" placeholder="Search domain, company, country" value="${esc(S.search)}"><button class="btn" id="csv">⬇ CSV</button></div>`; }
+function tableRows(r){
+  const T=TABLES[S.tab]; const [sk,sd]=S.sort[S.tab]||T.sort; const col=T.cols.find(c=>c[0]===sk);
+  const val=a=> col&&col[4]? col[4](a,r) : a[sk];
+  const q=S.search.toLowerCase();
+  let rows=T.rows(r).filter(a=>!q || [a.domain,a.company,a.country].some(x=>String(x||'').toLowerCase().includes(q)));
+  rows=rows.slice().sort((a,b)=>{ const x=val(a),y=val(b); if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1; return (x<y?-1:x>y?1:0)*sd; });
+  return rows;
+}
+function drawTable(r){
+  const T=TABLES[S.tab]; const [sk,sd]=S.sort[S.tab]||T.sort; const rows=tableRows(r); const PS=50;
+  const pages=Math.max(1,Math.ceil(rows.length/PS)); S.page=Math.min(S.page,pages-1);
+  let h=`<div class="tablewrap"><table><thead><tr>${T.cols.map(c=>`<th data-k="${c[0]}" class="${c[2]==='t'?'t':''} ${c[0]===sk?'sorted '+(sd>0?'asc':''):''}">${c[1]}</th>`).join('')}</tr></thead><tbody>`;
+  rows.slice(S.page*PS,(S.page+1)*PS).forEach(a=>{ h+='<tr>'+T.cols.map(c=>{ const v=c[3]?c[3](a,r):(typeof a[c[0]]==='number'?fmt(a[c[0]]):esc(a[c[0]]||'')); return `<td class="${c[2]==='t'?'t':''}">${v}</td>`; }).join('')+'</tr>'; });
+  if(!rows.length) h+=`<tr><td colspan="${T.cols.length}" class="empty">No accounts</td></tr>`;
+  h+=`</tbody></table></div><div class="pager">${rows.length.toLocaleString()} rows · page ${S.page+1} of ${pages} <button class="btn" id="prev" ${S.page?'':'disabled'}>← Prev</button><button class="btn" id="next" ${S.page<pages-1?'':'disabled'}>Next →</button></div>`;
+  $('#tbl').innerHTML=h;
+  $('#tbl').querySelectorAll('th').forEach(th=>th.onclick=()=>{ const k=th.dataset.k; const cur=S.sort[S.tab]||T.sort; S.sort[S.tab]=[k, cur[0]===k?-cur[1]:(T.cols.find(c=>c[0]===k)[2]==='t'?1:-1)]; S.page=0; drawTable(r); });
+  $('#prev').onclick=()=>{S.page--;drawTable(r)}; $('#next').onclick=()=>{S.page++;drawTable(r)};
+  $('#tabs').querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{S.tab=b.dataset.k;S.page=0;$('#tabs').querySelectorAll('button[data-k]').forEach(x=>x.classList.toggle('on',x===b));drawTable(r);});
+  const se=$('#search'); se.oninput=()=>{S.search=se.value;S.page=0;drawTable(r);};
+  $('#csv').onclick=()=>{ const lines=[T.cols.map(c=>c[1])]; tableRows(r).forEach(a=>lines.push(T.cols.map(c=>{ let v=c[4]?c[4](a,r):a[c[0]]; if(typeof v==='boolean') v=v?'yes':''; return v??''; })));
+    download(`${S.partner}_${S.tab}_${S.data.reportDate}.csv`, lines.map(l=>l.map(x=>{x=String(x);return /[",\n]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x;}).join(',')).join('\n')); };
+}
+function download(name,text){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:'text/csv'})); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+
+/* ---------- compare view ---------- */
+function renderCompare(){
+  const R=PARTNERS.map(p=>({p,r:compute(p.key)}));
+  const COLS=[
+    ['name','Partner','t',x=>`<span class="dot" style="background:${css(x.p.color)}"></span>${x.p.name}`,x=>x.p.name],
+    ['ta','Total accounts',null,null,x=>x.r.totalAccounts],
+    ['td','Total devices',null,null,x=>x.r.totalDevices],
+    ['aa','Active accounts',null,null,x=>x.r.activeAccounts],
+    ['ap','Active %',null,x=>pct(x.r.activeAccounts,x.r.totalAccounts),x=>x.r.activeAccounts/x.r.totalAccounts],
+    ['ad','Devices in active',null,null,x=>x.r.activeDevices],
+    ['na','New accounts',null,null,x=>x.r.newAccounts],
+    ['act','Activation %',null,x=>pct(x.r.newWithDevices,x.r.newAccounts),x=>x.r.newWithDevices/x.r.newAccounts],
+    ['nd','Devices in new',null,null,x=>x.r.newDevices],
+    ['avg','Avg dev / activated',null,x=>fmt1(x.r.avgDevNew),x=>x.r.avgDevNew],
+    ['nr','Est. revenue new',null,x=>usd(x.r.newRevenue),x=>x.r.newRevenue],
+    ['er','Est. revenue existing',null,x=>x.r.hasExisting?usd(x.r.exRevenue):'—',x=>x.r.hasExisting?x.r.exRevenue:null],
+    ['cr','Churn-risk %',null,x=>pct(x.r.churnAccounts,x.r.activeAccounts),x=>x.r.churnAccounts/x.r.activeAccounts],
+    ['big','Accounts 1K+',null,null,x=>x.r.tiers[0].accounts],
+  ];
+  S.cmpSort=S.cmpSort||['ad',-1];
+  let h=`<div class="section-title"><h2>Partner comparison</h2><span>Snapshot columns as of ${S.data.reportDate}; "new" and "revenue" columns cover the last ${S.period} months. Click a column to sort.</span></div>`;
+  h+=`<div class="card"><div class="tablewrap"><table id="cmp"></table></div><div class="small" style="margin-top:8px">Revenue uses each partner's own price basis (${PARTNERS.map(p=>p.name+': '+(S.prices[p.key]||DEFAULT_PRICES[p.key]).label).join(' · ')}), so compare revenue across partners with care.</div></div>`;
+  h+=`<div class="section-title"><h2>Trends by partner</h2></div><div class="grid">`;
+  h+=card('xNew','New accounts per month','All new accounts, by create date');
+  h+=card('xAct','Activation rate per month','% of new accounts that have ≥1 device');
+  h+=card('xDev','Devices in new accounts per month','');
+  h+=card('xRev','Estimated revenue — new accounts','Total for the period, USD');
+  h+=card('xTier','Active devices by account size','% of each partner\'s devices in active accounts');
+  h+=card('xFeat','Feature adoption — new activated accounts','% of new accounts with devices that used each feature');
+  h+=`</div>`;
+  $('#main').innerHTML=h;
+  const drawCmp=()=>{ const [k,d]=S.cmpSort; const c=COLS.find(c=>c[0]===k);
+    const rows=R.slice().sort((a,b)=>{const x=c[4](a),y=c[4](b); return (x<y?-1:x>y?1:0)*d;});
+    $('#cmp').innerHTML=`<thead><tr>${COLS.map(c=>`<th data-k="${c[0]}" class="${c[2]==='t'?'t':''} ${c[0]===k?'sorted '+(d>0?'asc':''):''}">${c[1]}</th>`).join('')}</tr></thead><tbody>`+
+      rows.map(x=>'<tr>'+COLS.map(c=>`<td class="${c[2]==='t'?'t':''}">${c[3]?c[3](x):fmt(c[4](x))}</td>`).join('')+'</tr>').join('')+'</tbody>';
+    $('#cmp').querySelectorAll('th').forEach(th=>th.onclick=()=>{ const k=th.dataset.k; S.cmpSort=[k,S.cmpSort[0]===k?-S.cmpSort[1]:(k==='name'?1:-1)]; drawCmp(); }); };
+  drawCmp();
+  const L=R[0].r.months.map(mLabel);
+  const line=(x,data)=>({label:x.p.name,data,borderColor:css(x.p.color),backgroundColor:css(x.p.color),borderWidth:2,pointRadius:3,pointHoverRadius:6,tension:0,spanGaps:true});
+  charts.xNew=new Chart($('#xNew'),{type:'line',data:{labels:L,datasets:R.map(x=>line(x,x.r.monthly.map(o=>o.newAccounts)))},options:baseOpts(false)});
+  const ao=baseOpts(false,v=>Math.round(v)+'%'); ao.scales.y.max=100;
+  charts.xAct=new Chart($('#xAct'),{type:'line',data:{labels:L,datasets:R.map(x=>line(x,x.r.monthly.map(o=>o.newAccounts?100*o.withDevices/o.newAccounts:null)))},options:ao});
+  charts.xDev=new Chart($('#xDev'),{type:'line',data:{labels:L,datasets:R.map(x=>line(x,x.r.monthly.map(o=>o.newDevices)))},options:baseOpts(false)});
+  const ro=baseOpts(false,usd); ro.plugins.legend.display=false;
+  charts.xRev=new Chart($('#xRev'),{type:'bar',data:{labels:R.map(x=>x.p.name),datasets:[bar('Est. revenue',R.map(x=>x.r.newRevenue),R.map(x=>css(x.p.color)))]},options:ro});
+  const tl=PARTNERS.length && R[0].r.tiers.map(t=>t.label);
+  const to=baseOpts(false,v=>Math.round(v)+'%');
+  charts.xTier=new Chart($('#xTier'),{type:'bar',data:{labels:tl,datasets:R.map(x=>bar(x.p.name,x.r.tiers.map(t=>x.r.activeDevices?100*t.devices/x.r.activeDevices:0),css(x.p.color)))},options:to});
+  const fl=R[0].r.featNew.map(f=>f.label);
+  charts.xFeat=new Chart($('#xFeat'),{type:'bar',data:{labels:fl,datasets:R.map(x=>bar(x.p.name,x.r.featNew.map(f=>f.base?100*f.n/f.base:0),css(x.p.color)))},options:baseOpts(false,v=>Math.round(v)+'%')});
+}
+
+/* ============================== SETTINGS ============================== */
+function renderSettings(){
+  let h='';
+  PARTNERS.forEach(p=>{ const pr=S.prices[p.key]||(S.prices[p.key]=JSON.parse(JSON.stringify(DEFAULT_PRICES[p.key])));
+    h+=`<div style="margin-top:10px"><b>${p.name}</b> <input data-p="${p.key}" data-f="label" value="${esc(pr.label)}" style="width:170px"></div>`;
+    pr.steps.forEach((s,i)=>{ h+=`<div class="price-row">from <input type="month" data-p="${p.key}" data-i="${i}" data-f="from" value="${s.from}"> $ <input type="number" step="0.01" data-p="${p.key}" data-i="${i}" data-f="price" value="${s.price}" style="width:90px"> ${pr.steps.length>1?`<button class="btn" data-del="${p.key}:${i}">✕</button>`:''}</div>`; });
+    h+=`<button class="btn" data-add="${p.key}" style="margin-top:4px">+ price change</button>`; });
+  $('#priceEditor').innerHTML=h;
+  $('#priceEditor').querySelectorAll('input').forEach(inp=>inp.onchange=()=>{ const pr=S.prices[inp.dataset.p]; if(inp.dataset.f==='label') pr.label=inp.value; else pr.steps[+inp.dataset.i][inp.dataset.f]= inp.dataset.f==='price'?+inp.value:inp.value; });
+  $('#priceEditor').querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{ S.prices[b.dataset.add].steps.push({from:new Date().toISOString().slice(0,7),price:0}); renderSettings(); });
+  $('#priceEditor').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{ const [k,i]=b.dataset.del.split(':'); S.prices[k].steps.splice(+i,1); renderSettings(); });
+  $('#churnDays').value=S.churnDays; $('#swapDates').checked=S.swapDates;
+  const bl=Object.keys(S.baseline);
+  $('#snapList').innerHTML = (S.snapshots.length? `<table><thead><tr><th class="t">Report date</th><th>Accounts with devices</th><th></th></tr></thead><tbody>${S.snapshots.map(s=>`<tr><td>${s.date}</td><td>${fmt(Object.values(s.partners).reduce((a,m)=>a+Object.keys(m).length,0))}</td><td><button class="btn" data-snap="${s.date}">Delete</button></td></tr>`).join('')}</tbody></table>`:'<div class="small">None yet.</div>')
+    + (bl.length?`<div class="small" style="margin-top:6px">Existing-account history imported from overview sheets: ${bl.map(k=>PARTNERS.find(p=>p.key===k).name).join(', ')} <button class="btn" id="clearBase">Clear</button></div>`:'');
+  $('#snapList').querySelectorAll('[data-snap]').forEach(b=>b.onclick=async()=>{ await DB.del('snapshots',b.dataset.snap); S.snapshots=S.snapshots.filter(s=>s.date!==b.dataset.snap); renderSettings(); });
+  const cb=$('#clearBase'); if(cb) cb.onclick=async()=>{ for(const k of Object.keys(S.baseline)) await DB.del('baseline',k); S.baseline={}; renderSettings(); };
+}
+$('#settingsBtn').onclick=()=>{ renderSettings(); $('#settings').showModal(); };
+$('#closeSettings').onclick=()=>{ S.churnDays=+$('#churnDays').value; const sw=$('#swapDates').checked; const swChanged=sw!==S.swapDates; S.swapDates=sw;
+  LS.set('prices',S.prices); LS.set('churnDays',S.churnDays); LS.set('swapDates',S.swapDates); $('#settings').close();
+  if(swChanged && S.data) alert('Reload the xlsx to apply the date setting.'); render(); };
+$('#resetPrices').onclick=()=>{ S.prices=JSON.parse(JSON.stringify(DEFAULT_PRICES)); renderSettings(); };
+
+/* ============================== BOOT ============================== */
+$('#loadBtn').onclick=()=>$('#file').click();
+$('#file').onchange=e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); e.target.value=''; };
+document.addEventListener('click',e=>{ if(e.target.closest('#drop')) $('#file').click(); });
+['dragover','dragenter'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault(); const d=$('#drop'); if(d) d.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault(); const d=$('#drop'); if(d) d.classList.remove('over');}));
+document.addEventListener('drop',e=>{ const f=e.dataTransfer&&e.dataTransfer.files[0]; if(f) handleFile(f); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>render());
+(async()=>{
+  S.snapshots=(await DB.all('snapshots')).sort((a,b)=>a.date<b.date?-1:1);
+  (await DB.all('baseline')).forEach(b=>S.baseline[b.key]=b.months);
+  renderHeader();
+})();
+</script>
+</body>
+</html>
